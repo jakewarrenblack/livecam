@@ -373,15 +373,15 @@ function LiveCam( config ) {
     if( gst_tcp_addr ) Assert.ok( typeof( gst_tcp_addr ), 'string' );
     if( webcam ) Assert.ok( typeof( webcam ), 'object' );
 
-    if( !( new GstLaunch() ).isAvailable() ) {
-        console.log( "==================================================" );
-        console.log( "Unable to locate gst-launch executable." );
-        console.log( "Look at https://github.com/sepehr-laal/livecam" );
-        console.log( "You are most likely missing the GStreamer runtime." );
-        console.log( "==================================================" );
-
-        throw new Error( 'Unable to broadcast.' );
-    }
+    // if( !( new GstLaunch() ).isAvailable() ) {
+    //     console.log( "==================================================" );
+    //     console.log( "Unable to locate gst-launch executable." );
+    //     console.log( "Look at https://github.com/sepehr-laal/livecam" );
+    //     console.log( "You are most likely missing the GStreamer runtime." );
+    //     console.log( "==================================================" );
+    //
+    //     throw new Error( 'Unable to broadcast.' );
+    // }
 
     console.log( "LiveCam parameters:", {
         'broadcast_addr': broadcast_addr,
