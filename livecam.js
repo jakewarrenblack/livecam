@@ -225,10 +225,12 @@ function SocketCamWrapper(
             } );
 
             dicer.on( 'part', function( part ) {
+                console.log( 'part: ', part );
                 var frameEncoded = '';
                 part.setEncoding( 'base64' );
 
                 part.on( 'data', function( data ) {
+                    console.log( 'data: ', data );
                     frameEncoded += data;
                 } );
                 part.on( 'end', function() {
