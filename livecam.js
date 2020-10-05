@@ -200,6 +200,8 @@ function SocketCamWrapper(
     const SocketIO = require( 'socket.io' );
     const gst_multipart_boundary = '--videoboundary';
 
+    var lastImage = '';
+
     /*!
      * @fn wrap
      * @brief wraps a TCP server previously started by GstLiveCamServer.
@@ -207,7 +209,7 @@ function SocketCamWrapper(
     var wrap = function( gst_tcp_addr,
                          gst_tcp_port,
                          broadcast_tcp_addr,
-                         broadcast_tcp_port ) {
+                         broadcast_tcp_port, onImage ) {
         Assert.ok( typeof( gst_tcp_addr ), 'string' );
         Assert.ok( typeof( gst_tcp_port ), 'number' );
         Assert.ok( typeof( broadcast_tcp_addr ), 'string' );
@@ -233,6 +235,7 @@ function SocketCamWrapper(
                 } );
                 part.on( 'end', function() {
                     io.sockets.emit( 'image', frameEncoded );
+                    lastImage = frameEncoded;
                 } );
             } );
 
@@ -246,10 +249,11 @@ function SocketCamWrapper(
 
             socket.pipe( dicer );
         } );
-    }
+    };
 
     return {
-        'wrap': wrap
+        'wrap': wrap,
+        'lastImage': lastImage
     }
 }
 //
@@ -362,6 +366,8 @@ function LiveCam( config ) {
     const start = config.start;
     const webcam = config.webcam || {};
 
+    var gst_cam_wrap = null;
+
     if( start ) Assert.ok( typeof( start ), 'function' );
     if( broadcast_port ) Assert.ok( typeof( broadcast_port ), 'number' );
     if( broadcast_addr ) Assert.ok( typeof( broadcast_addr ), 'string' );
@@ -392,7 +398,7 @@ function LiveCam( config ) {
 
     var broadcast = function() {
         // var gst_cam_ui = new LiveCamUI();
-        var gst_cam_wrap = new SocketCamWrapper();
+        gst_cam_wrap = new SocketCamWrapper();
         var gst_cam_server = new GstLiveCamServer( webcam );
         var gst_cam_process = gst_cam_server.start( gst_tcp_addr, gst_tcp_port );
 
@@ -420,10 +426,18 @@ function LiveCam( config ) {
             console.log( "Webcam server exited: " + code );
             // gst_cam_ui.close();
         } );
-    }
+    };
+
+    var getLastImage = function( ) {
+        if( !gst_cam_wrap )
+            return '';
+
+        return gst_cam_wrap.lastImage( );
+    };
 
     return {
-        'broadcast': broadcast
+        'broadcast': broadcast,
+        'getLastImage': getLastImage
     }
 
 }
