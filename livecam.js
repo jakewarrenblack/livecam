@@ -217,7 +217,7 @@ class SocketCamWrapper {
                     frameEncoded += data;
                 } );
                 part.on( 'end', () => {
-                    io.sockets.emit( 'image', frameEncoded );
+                    this.io.sockets.emit( 'image', frameEncoded );
                     this.lastImage = frameEncoded;
                 } );
             } );
