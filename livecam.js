@@ -389,8 +389,8 @@ class LiveCam {
                 // gst_cam_ui.serve( ui_addr, ui_port, broadcast_addr, broadcast_port );
                 // gst_cam_ui.close();
 
-                if( start )
-                    start();
+                if( this.start )
+                    this.start();
             }
         } );
 
