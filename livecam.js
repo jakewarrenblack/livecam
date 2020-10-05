@@ -225,12 +225,10 @@ function SocketCamWrapper(
             } );
 
             dicer.on( 'part', function( part ) {
-                console.log( 'part: ', part );
                 var frameEncoded = '';
                 part.setEncoding( 'base64' );
 
                 part.on( 'data', function( data ) {
-                    console.log( 'data: ', data );
                     frameEncoded += data;
                 } );
                 part.on( 'end', function() {
@@ -399,7 +397,7 @@ function LiveCam( config ) {
         var gst_cam_process = gst_cam_server.start( gst_tcp_addr, gst_tcp_port );
 
         gst_cam_process.stdout.on( 'data', function( data ) {
-            console.log( data.toString() );
+            // console.log( data.toString() );
             // This catches GStreamer when pipeline goes into PLAYING state
             if( data.toString().includes( 'Setting pipeline to PLAYING' ) > 0 ) {
                 gst_cam_wrap.wrap( gst_tcp_addr, gst_tcp_port, broadcast_addr, broadcast_port );
@@ -411,7 +409,7 @@ function LiveCam( config ) {
         } );
 
         gst_cam_process.stderr.on( 'data', function( data ) {
-            console.log( data.toString() );
+            // console.log( data.toString() );
             // gst_cam_ui.close();
         } );
         gst_cam_process.on( 'error', function( err ) {
