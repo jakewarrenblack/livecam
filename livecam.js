@@ -42,7 +42,7 @@ class GstLaunch {
         }
 
         return detected_path;
-    },
+    }
 
     /**
      * @fn getVersion
