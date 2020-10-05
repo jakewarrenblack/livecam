@@ -1,34 +1,40 @@
+const SpawnSync = require( 'child_process' ).spawnSync;
+const Spawn = require( 'child_process' ).spawn;
+const Assert = require( 'assert' );
+const Path = require( 'path' );
+const FS = require( 'fs' );
+const Net = require( 'net' );
+const Http = require( 'http' );
+const Dicer = require( 'dicer' );
+const SocketIO = require( 'socket.io' );
+
 /*!
  * @class GstLaunch
  * @brief Class that encapsulates "gst-launch" executable.
  * @note Refer to README.md to see how to install GStreamer
  */
-function GstLaunch() {
 
-    const gst_launch_executable = 'gst-launch-1.0';
-    const gst_launch_versionarg = '--version';
-
-    const SpawnSync = require( 'child_process' ).spawnSync;
-    const Spawn = require( 'child_process' ).spawn;
-    const Assert = require( 'assert' );
-    const Path = require( 'path' );
-    const FS = require( 'fs' );
+class GstLaunch {
+    constructor( ) {
+        this.gst_launch_executable = 'gst-launch-1.0';
+        this.gst_launch_versionarg = '--version';
+    }
 
     /**
      * @fn getPath
      * @brief Returns path to gst-launch or undefined on error
      */
-    var getPath = function() {
-        var detected_path = undefined;
+    getPath() {
+        let detected_path = undefined;
 
         // Look for GStreamer on PATH
-        var path_dirs = process.env.PATH.split( ':' );
-        for( var index = 0; index < path_dirs.length; ++index ) {
+        const path_dirs = process.env.PATH.split( ':' );
+        for( let index = 0; index < path_dirs.length; ++index ) {
             try {
-                var base = Path.normalize( path_dirs[ index ] );
-                var bin = Path.join(
+                let base = Path.normalize( path_dirs[ index ] );
+                let bin = Path.join(
                     base,
-                    gst_launch_executable );
+                    this.gst_launch_executable );
                 FS.accessSync( bin, FS.F_OK );
                 detected_path = bin;
             } catch( e ) { /* no-op */
@@ -36,24 +42,23 @@ function GstLaunch() {
         }
 
         return detected_path;
-    }
+    },
 
     /**
      * @fn getVersion
      * @brief Returns version string of GStreamer on this machine by
      * invoking the gst-launch executable or 'undefined' on failure.
      */
-    var getVersion = function() {
-        var version_str = undefined;
+    getVersion( ) {
+        let version_str = undefined;
         try {
-            var gst_launch_path = getPath();
+            let gst_launch_path = this.getPath();
             Assert.ok( typeof( gst_launch_path ), 'string' );
 
-            var output = SpawnSync(
-                gst_launch_path, [ gst_launch_versionarg ], {
+            let output = SpawnSync(
+                gst_launch_path, [ this.gst_launch_versionarg ], {
                     'timeout': 1000
-                } )
-                .stdout;
+                } ).stdout;
 
             if( output && output.toString().includes( 'GStreamer' ) ) {
                 version_str = output
@@ -72,8 +77,8 @@ function GstLaunch() {
      * @fn isAvailable
      * @brief Answers true if gst-launch executable is available
      */
-    var isAvailable = function() {
-        return true; // getVersion() != undefined;
+    isAvailable( ) {
+        return this.getVersion() !== undefined;
     }
 
     /*!
@@ -84,84 +89,75 @@ function GstLaunch() {
      * https://gstreamer.freedesktop.org/data/doc/gstreamer/head/manual/html/chapter-programs.html
      * @usage spawnPipeline('videotestsrc ! autovideosink')
      */
-    var spawnPipeline = function( pipeline ) {
+    spawnPipeline( pipeline ) {
         Assert.ok( typeof( pipeline ), 'string' );
-        Assert.ok( isAvailable(), "gst-launch is not available." );
+        Assert.ok( this.isAvailable(), "gst-launch is not available." );
 
-        var gst_launch_path = getPath();
+        let gst_launch_path = this.getPath();
         Assert.ok( typeof( gst_launch_path ), 'string' );
 
         return Spawn( gst_launch_path, pipeline.split( ' ' ) );
     }
-
-    return {
-        'getPath': getPath,
-        'getVersion': getVersion,
-        'isAvailable': isAvailable,
-        'spawnPipeline': spawnPipeline
-    }
-
 }
 
 /*!
  * @class GstLiveCamServer
  * @brief Encapsulates a GStreamer pipeline to broadcast default webcam.
  */
-function GstLiveCamServer( config ) {
+class GstLiveCamServer {
+    constructor( config ) {
+        config = config || {};
+        Assert.ok( typeof( config ), 'object' );
 
-    const Assert = require( 'assert' );
+        this.fake = config.fake || false;
+        this.width = config.width || 800;
+        this.height = config.height || 600;
+        this.framerate = config.framerate || 30;
+        this.grayscale = config.grayscale || false;
+        this.deviceIndex = config.deviceIndex || -1;
 
-    config = config || {};
-    Assert.ok( typeof( config ), 'object' );
+        Assert.ok( typeof( this.fake ), 'boolean' );
+        Assert.ok( typeof( this.width ), 'number' );
+        Assert.ok( typeof( this.height ), 'number' );
+        Assert.ok( typeof( this.framerate ), 'number' );
+        Assert.ok( typeof( this.grayscale ), 'boolean' );
 
-    const fake = config.fake || false;
-    const width = config.width || 800;
-    const height = config.height || 600;
-    const framerate = config.framerate || 30;
-    const grayscale = config.grayscale || false;
-    const deviceIndex = config.deviceIndex || -1;
+        this.gst_multipart_boundary = '--videoboundary';
+        this.gst_video_src = '';
 
-    Assert.ok( typeof( fake ), 'boolean' );
-    Assert.ok( typeof( width ), 'number' );
-    Assert.ok( typeof( height ), 'number' );
-    Assert.ok( typeof( framerate ), 'number' );
-    Assert.ok( typeof( grayscale ), 'boolean' );
+        if( !this.fake ) {
+            this.gst_video_src = 'v4l2src ! decodebin';
+        } else {
+            this.gst_video_src = 'videotestsrc';
+        }
 
-    var gst_multipart_boundary = '--videoboundary';
-    var gst_video_src = '';
+        if( this.width > 0 || this.height > 0 ) {
+            this.gst_video_src += ' ! videoscale ! video/x-raw,width=' + parseInt( this.width ) + ',height=' + parseInt( this.height );
+        }
 
-    if( !fake ) {
-        gst_video_src = 'v4l2src ! decodebin';
-    } else {
-        gst_video_src = 'videotestsrc';
-    }
+        if( this.framerate > 0 ) {
+            this.gst_video_src += ' ! videorate ! video/x-raw,framerate=' + parseInt( this.framerate ) + '/1';
+        }
 
-    if( width > 0 || height > 0 ) {
-        gst_video_src += ' ! videoscale ! video/x-raw,width=' + parseInt( width ) + ',height=' + parseInt( height );
-    }
-
-    if( framerate > 0 ) {
-        gst_video_src += ' ! videorate ! video/x-raw,framerate=' + parseInt( framerate ) + '/1';
-    }
-
-    if( grayscale ) {
-        gst_video_src += ' ! videobalance saturation=0.0 ! videoconvert';
+        if( this.grayscale ) {
+            this.gst_video_src += ' ! videobalance saturation=0.0 ! videoconvert';
+        }
     }
 
     /*!
-     * @fn start
-     * @brief Starts a GStreamer pipeline that broadcasts the default
-     * webcam over the given TCP address and port.
-     * @return A Node <child-process> of the launched pipeline
-     */
-    var start = function( tcp_addr, tcp_port ) {
+    * @fn start
+    * @brief Starts a GStreamer pipeline that broadcasts the default
+    * webcam over the given TCP address and port.
+    * @return A Node <child-process> of the launched pipeline
+    */
+    start( tcp_addr, tcp_port ) {
         Assert.ok( typeof( tcp_addr ), 'string' );
         Assert.ok( typeof( tcp_port ), 'number' );
 
-        const cam_pipeline = gst_video_src + ' ! jpegenc ! multipartmux  boundary="' +
-            gst_multipart_boundary + '" ! tcpserversink host=' + tcp_addr + ' port=' + tcp_port;
+        const cam_pipeline = this.gst_video_src + ' ! jpegenc ! multipartmux  boundary="' +
+            this.gst_multipart_boundary + '" ! tcpserversink host=' + tcp_addr + ' port=' + tcp_port;
 
-        var gst_launch = new GstLaunch();
+        let gst_launch = new GstLaunch();
 
         if( gst_launch.isAvailable() ) {
             console.log( 'GstLaunch found: ' + gst_launch.getPath() );
@@ -173,11 +169,6 @@ function GstLiveCamServer( config ) {
             throw new Error( 'GstLaunch not found.' );
         }
     }
-
-    return {
-        'start': start
-    }
-
 }
 
 /*!
@@ -187,74 +178,61 @@ function GstLiveCamServer( config ) {
  * video frames.
  * @credit http://stackoverflow.com/a/23605892/388751
  */
-function SocketCamWrapper(
-    gst_tcp_addr,
-    gst_tcp_port,
-    broadcast_tcp_addr,
-    broadcast_tcp_port ) {
+class SocketCamWrapper {
+    constructor( gst_tcp_addr, gst_tcp_port, broadcast_tcp_addr, broadcast_tcp_port ) {
+        this.gst_multipart_boundary = '--videoboundary';
+        this.lastImage = '';
+    }
 
-    const Net = require( 'net' );
-    const Http = require( 'http' );
-    const Dicer = require( 'dicer' );
-    const Assert = require( 'assert' );
-    const SocketIO = require( 'socket.io' );
-    const gst_multipart_boundary = '--videoboundary';
-
-    var lastImage = '';
+    getLastImage( ) {
+        return this.lastImage;
+    }
 
     /*!
-     * @fn wrap
-     * @brief wraps a TCP server previously started by GstLiveCamServer.
-     */
-    var wrap = function( gst_tcp_addr,
-                         gst_tcp_port,
-                         broadcast_tcp_addr,
-                         broadcast_tcp_port, onImage ) {
+    * @fn wrap
+    * @brief wraps a TCP server previously started by GstLiveCamServer.
+    */
+    wrap( gst_tcp_addr, gst_tcp_port, broadcast_tcp_addr, broadcast_tcp_port ) {
         Assert.ok( typeof( gst_tcp_addr ), 'string' );
         Assert.ok( typeof( gst_tcp_port ), 'number' );
         Assert.ok( typeof( broadcast_tcp_addr ), 'string' );
         Assert.ok( typeof( broadcast_tcp_port ), 'number' );
 
-        var socket = Net.Socket();
+        this.socket = Net.Socket();
 
-        socket.connect( gst_tcp_port, gst_tcp_addr, function() {
-            var io = SocketIO.listen(
+        this.socket.connect( gst_tcp_port, gst_tcp_addr, () => {
+            this.io = SocketIO.listen(
                 Http.createServer()
                     .listen( broadcast_tcp_port, broadcast_tcp_addr ) );
 
-            var dicer = new Dicer( {
-                boundary: gst_multipart_boundary
+            this.dicer = new Dicer( {
+                boundary: this.gst_multipart_boundary
             } );
 
-            dicer.on( 'part', function( part ) {
-                var frameEncoded = '';
+            this.dicer.on( 'part', ( part ) => {
+                let frameEncoded = '';
                 part.setEncoding( 'base64' );
 
-                part.on( 'data', function( data ) {
+                part.on( 'data', ( data ) => {
                     frameEncoded += data;
                 } );
-                part.on( 'end', function() {
+                part.on( 'end', () => {
                     io.sockets.emit( 'image', frameEncoded );
-                    lastImage = frameEncoded;
+                    this.lastImage = frameEncoded;
                 } );
             } );
 
-            dicer.on( 'finish', function() {
+            this.dicer.on( 'finish', () => {
                 console.log( 'Dicer finished: ' + broadcast_tcp_addr + ':' + broadcast_tcp_port );
             } );
 
-            socket.on( 'close', function() {
+            this.socket.on( 'close', () => {
                 console.log( 'Socket closed: ' + broadcast_tcp_addr + ':' + broadcast_tcp_port );
             } );
 
-            socket.pipe( dicer );
+            this.socket.pipe( this.dicer );
         } );
     };
-
-    return {
-        'wrap': wrap,
-        'lastImage': lastImage
-    }
 }
 //
 // /*!
@@ -350,96 +328,92 @@ function SocketCamWrapper(
  * config.start --> event emitted when streaming is started
  *    [optional] [default: null]
  */
-function LiveCam( config ) {
+class LiveCam {
+    constructor( config ) {
+        config = config || {};
+        Assert.ok( typeof( config ), 'object' );
 
-    const Assert = require( 'assert' );
+        this.gst_tcp_addr = config.gst_addr || "127.0.0.1";
+        this.gst_tcp_port = config.gst_port || 10000;
+        this.ui_addr = config.ui_addr || "127.0.0.1";
+        this.ui_port = config.ui_port || 11000;
+        this.broadcast_addr = config.broadcast_addr || "127.0.0.1";
+        this.broadcast_port = config.broadcast_port || 12000;
+        this.start = config.start;
+        this.webcam = config.webcam || {};
 
-    config = config || {};
-    Assert.ok( typeof( config ), 'object' );
+        this.gst_cam_wrap = null;
+        this.gst_cam_server = null;
+        this.gst_cam_process = null;
 
-    const gst_tcp_addr = config.gst_addr || "127.0.0.1";
-    const gst_tcp_port = config.gst_port || 10000;
-    const ui_addr = config.ui_addr || "127.0.0.1";
-    const ui_port = config.ui_port || 11000;
-    const broadcast_addr = config.broadcast_addr || "127.0.0.1";
-    const broadcast_port = config.broadcast_port || 12000;
-    const start = config.start;
-    const webcam = config.webcam || {};
+        if( this.start ) Assert.ok( typeof( this.start ), 'function' );
+        if( this.broadcast_port ) Assert.ok( typeof( this.broadcast_port ), 'number' );
+        if( this.broadcast_addr ) Assert.ok( typeof( this.broadcast_addr ), 'string' );
+        if( this.ui_port ) Assert.ok( typeof( this.ui_port ), 'number' );
+        if( this.ui_addr ) Assert.ok( typeof( this.ui_addr ), 'string' );
+        if( this.gst_tcp_port ) Assert.ok( typeof( this.gst_tcp_port ), 'number' );
+        if( this.gst_tcp_addr ) Assert.ok( typeof( this.gst_tcp_addr ), 'string' );
+        if( this.webcam ) Assert.ok( typeof( this.webcam ), 'object' );
 
-    var gst_cam_wrap = null;
+        if( !( new GstLaunch() ).isAvailable() ) {
+            console.log( "==================================================" );
+            console.log( "Unable to locate gst-launch executable." );
+            console.log( "Look at https://github.com/sepehr-laal/livecam" );
+            console.log( "You are most likely missing the GStreamer runtime." );
+            console.log( "==================================================" );
 
-    if( start ) Assert.ok( typeof( start ), 'function' );
-    if( broadcast_port ) Assert.ok( typeof( broadcast_port ), 'number' );
-    if( broadcast_addr ) Assert.ok( typeof( broadcast_addr ), 'string' );
-    if( ui_port ) Assert.ok( typeof( ui_port ), 'number' );
-    if( ui_addr ) Assert.ok( typeof( ui_addr ), 'string' );
-    if( gst_tcp_port ) Assert.ok( typeof( gst_tcp_port ), 'number' );
-    if( gst_tcp_addr ) Assert.ok( typeof( gst_tcp_addr ), 'string' );
-    if( webcam ) Assert.ok( typeof( webcam ), 'object' );
+            throw new Error( 'Unable to broadcast.' );
+        }
 
-    if( !( new GstLaunch() ).isAvailable() ) {
-        console.log( "==================================================" );
-        console.log( "Unable to locate gst-launch executable." );
-        console.log( "Look at https://github.com/sepehr-laal/livecam" );
-        console.log( "You are most likely missing the GStreamer runtime." );
-        console.log( "==================================================" );
-
-        throw new Error( 'Unable to broadcast.' );
+        console.log( "LiveCam parameters:", {
+            'broadcast_addr': this.broadcast_addr,
+            'broadcast_port': this.broadcast_port,
+            'ui_addr': this.ui_addr,
+            'ui_port': this.ui_port,
+            'gst_tcp_addr': this.gst_tcp_addr,
+            'gst_tcp_port': this.gst_tcp_port
+        } );
     }
 
-    console.log( "LiveCam parameters:", {
-        'broadcast_addr': broadcast_addr,
-        'broadcast_port': broadcast_port,
-        'ui_addr': ui_addr,
-        'ui_port': ui_port,
-        'gst_tcp_addr': gst_tcp_addr,
-        'gst_tcp_port': gst_tcp_port
-    } );
-
-    var broadcast = function() {
+    broadcast( ) {
         // var gst_cam_ui = new LiveCamUI();
-        gst_cam_wrap = new SocketCamWrapper();
-        var gst_cam_server = new GstLiveCamServer( webcam );
-        var gst_cam_process = gst_cam_server.start( gst_tcp_addr, gst_tcp_port );
+        this.gst_cam_wrap = new SocketCamWrapper();
+        this.gst_cam_server = new GstLiveCamServer( this.webcam );
+        this.gst_cam_process = this.gst_cam_server.start( this.gst_tcp_addr, this.gst_tcp_port );
 
-        gst_cam_process.stdout.on( 'data', function( data ) {
+        this.gst_cam_process.stdout.on( 'data', ( data ) => {
             // console.log( data.toString() );
             // This catches GStreamer when pipeline goes into PLAYING state
             if( data.toString().includes( 'Setting pipeline to PLAYING' ) > 0 ) {
-                gst_cam_wrap.wrap( gst_tcp_addr, gst_tcp_port, broadcast_addr, broadcast_port );
+                this.gst_cam_wrap.wrap( this.gst_tcp_addr, this.gst_tcp_port, this.broadcast_addr, this.broadcast_port );
                 // gst_cam_ui.serve( ui_addr, ui_port, broadcast_addr, broadcast_port );
                 // gst_cam_ui.close();
 
-                if( start ) start();
+                if( start )
+                    start();
             }
         } );
 
-        gst_cam_process.stderr.on( 'data', function( data ) {
+        this.gst_cam_process.stderr.on( 'data', ( data ) => {
             // console.log( data.toString() );
             // gst_cam_ui.close();
         } );
-        gst_cam_process.on( 'error', function( err ) {
+        this.gst_cam_process.on( 'error', ( err ) => {
             console.log( "Webcam server error: " + err );
             // gst_cam_ui.close();
         } );
-        gst_cam_process.on( 'exit', function( code ) {
+        this.gst_cam_process.on( 'exit', ( code ) => {
             console.log( "Webcam server exited: " + code );
             // gst_cam_ui.close();
         } );
-    };
-
-    var getLastImage = function( ) {
-        if( !gst_cam_wrap )
-            return '';
-
-        return gst_cam_wrap.lastImage( );
-    };
-
-    return {
-        'broadcast': broadcast,
-        'getLastImage': getLastImage
     }
 
+    getLastImage( ) {
+        if( !this.gst_cam_wrap )
+            return '';
+
+        return this.gst_cam_wrap.getLastImage( );
+    }
 }
 
 module.exports = LiveCam;
