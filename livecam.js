@@ -28,7 +28,7 @@ class GstLaunch {
         let detected_path = undefined;
 
         // Look for GStreamer on PATH
-        const path_dirs = process.env.PATH.split( ':' );
+        const path_dirs = process.env.PATH.split( ';' );
         console.log( 'path dirs: ', path_dirs );
         for( let index = 0; index < path_dirs.length; ++index ) {
             try {

@@ -20,12 +20,6 @@
   <component name="NodeModulesDirectoryManager">
     <handled-path value="$PROJECT_DIR$/node_modules" />
   </component>
-  <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="-8" />
-    <option name="y" value="-8" />
-    <option name="width" value="1936" />
-    <option name="height" value="1056" />
-  </component>
   <component name="ProjectId" id="1n3UOa9CvO6mnCUAU74MdzLd4Es" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -58,7 +52,7 @@
       <workItem from="1605101607096" duration="765000" />
       <workItem from="1610618238060" duration="405000" />
       <workItem from="1620736022513" duration="704000" />
-      <workItem from="1622537695443" duration="1710000" />
+      <workItem from="1622537695443" duration="1895000" />
     </task>
     <servers />
   </component>
