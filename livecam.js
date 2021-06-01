@@ -125,8 +125,11 @@ class GstLiveCamServer {
         this.gst_multipart_boundary = '--videoboundary';
         this.gst_video_src = '';
 
+        // gst-launch-1.0 -v ksvideosrc do-stats=TRUE ! image/jpeg, width=640, height=480 ! jpegdec ! videoconvert ! autovideosink
+
         if( !this.fake ) {
-            this.gst_video_src = 'v4l2src ! decodebin';
+            // this.gst_video_src = 'v4l2src ! decodebin';
+            this.gst_video_src = '-v ksvideosrc do-stats=TRUE';
         } else {
             this.gst_video_src = 'videotestsrc';
         }
@@ -156,6 +159,8 @@ class GstLiveCamServer {
 
         const cam_pipeline = this.gst_video_src + ' ! jpegenc ! multipartmux  boundary="' +
             this.gst_multipart_boundary + '" ! tcpserversink host=' + tcp_addr + ' port=' + tcp_port;
+
+        console.log( 'cam pipeline: ', cam_pipeline );
 
         let gst_launch = new GstLaunch();
 
