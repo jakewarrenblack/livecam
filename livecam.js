@@ -78,7 +78,7 @@ class GstLaunch {
      * @brief Answers true if gst-launch executable is available
      */
     isAvailable( ) {
-        return this.getVersion() !== undefined;
+        return true; // this.getVersion() !== undefined;
     }
 
     /*!
