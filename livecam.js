@@ -29,6 +29,7 @@ class GstLaunch {
 
         // Look for GStreamer on PATH
         const path_dirs = process.env.PATH.split( ':' );
+        console.log( 'path dirs: ', path_dirs );
         for( let index = 0; index < path_dirs.length; ++index ) {
             try {
                 let base = Path.normalize( path_dirs[ index ] );
@@ -93,8 +94,12 @@ class GstLaunch {
         Assert.ok( typeof( pipeline ), 'string' );
         Assert.ok( this.isAvailable(), "gst-launch is not available." );
 
+        console.log( 'pipeline: ', pipeline );
+
         let gst_launch_path = this.getPath();
         Assert.ok( typeof( gst_launch_path ), 'string' );
+
+        console.log( 'path: ', gst_launch_path );
 
         return Spawn( gst_launch_path, pipeline.split( ' ' ) );
     }
