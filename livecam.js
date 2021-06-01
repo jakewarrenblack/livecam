@@ -25,26 +25,27 @@ class GstLaunch {
      * @brief Returns path to gst-launch or undefined on error
      */
     getPath() {
-        let detected_path = undefined;
-
-        // Look for GStreamer on PATH
-        const path_dirs = process.env.PATH.split( ';' );
-        console.log( 'path dirs: ', path_dirs );
-        for( let index = 0; index < path_dirs.length; ++index ) {
-            try {
-                let base = Path.normalize( path_dirs[ index ] );
-                console.log( 'base: ', base );
-                let bin = Path.join(
-                    base,
-                    this.gst_launch_executable );
-                console.log( 'bin: ', bin );
-                FS.accessSync( bin, FS.F_OK );
-                detected_path = bin;
-            } catch( e ) { /* no-op */
-            }
-        }
-
-        return detected_path;
+        // let detected_path = undefined;
+        //
+        // // Look for GStreamer on PATH
+        // const path_dirs = process.env.PATH.split( ';' );
+        // console.log( 'path dirs: ', path_dirs );
+        // for( let index = 0; index < path_dirs.length; ++index ) {
+        //     try {
+        //         let base = Path.normalize( path_dirs[ index ] );
+        //         console.log( 'base: ', base );
+        //         let bin = Path.join(
+        //             base,
+        //             this.gst_launch_executable );
+        //         console.log( 'bin: ', bin );
+        //         FS.accessSync( bin, FS.F_OK );
+        //         detected_path = bin;
+        //     } catch( e ) { /* no-op */
+        //     }
+        // }
+        //
+        // return detected_path;
+        return this.gst_launch_executable;
     }
 
     /**
@@ -81,7 +82,7 @@ class GstLaunch {
      * @brief Answers true if gst-launch executable is available
      */
     isAvailable( ) {
-        return true; // this.getVersion() !== undefined;
+        return this.getVersion() !== undefined;
     }
 
     /*!
