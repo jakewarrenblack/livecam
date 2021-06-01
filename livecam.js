@@ -33,9 +33,11 @@ class GstLaunch {
         for( let index = 0; index < path_dirs.length; ++index ) {
             try {
                 let base = Path.normalize( path_dirs[ index ] );
+                console.log( 'base: ', base );
                 let bin = Path.join(
                     base,
                     this.gst_launch_executable );
+                console.log( 'bin: ', bin );
                 FS.accessSync( bin, FS.F_OK );
                 detected_path = bin;
             } catch( e ) { /* no-op */
