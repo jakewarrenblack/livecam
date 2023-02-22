@@ -6,7 +6,8 @@ const FS = require( 'fs' );
 const Net = require( 'net' );
 const Http = require( 'http' );
 const Dicer = require( 'dicer' );
-const SocketIO = require( 'socket.io' );
+
+const OS = require('os');
 
 /*!
  * @class GstLaunch
@@ -24,28 +25,80 @@ class GstLaunch {
      * @fn getPath
      * @brief Returns path to gst-launch or undefined on error
      */
-    getPath() {
-        // let detected_path = undefined;
-        //
-        // // Look for GStreamer on PATH
-        // const path_dirs = process.env.PATH.split( ';' );
-        // console.log( 'path dirs: ', path_dirs );
-        // for( let index = 0; index < path_dirs.length; ++index ) {
-        //     try {
-        //         let base = Path.normalize( path_dirs[ index ] );
-        //         console.log( 'base: ', base );
-        //         let bin = Path.join(
-        //             base,
-        //             this.gst_launch_executable );
-        //         console.log( 'bin: ', bin );
-        //         FS.accessSync( bin, FS.F_OK );
-        //         detected_path = bin;
-        //     } catch( e ) { /* no-op */
-        //     }
-        // }
-        //
-        // return detected_path;
-        return this.gst_launch_executable;
+    getPath = function() {
+        console.log('** TRYING TO GET GSTREAMER PATH **')
+        var detected_path = undefined;
+
+        if (OS.platform() == 'win32') {
+            console.log('** PLATFORM IS WIN32 **')
+            // On Windows, GStreamer MSI installer defines the following
+            // environment variables.
+            const detected_path_x64 = process.env.GSTREAMER_1_0_ROOT_X86_64;
+            const detected_path_x32 = process.env.GSTREAMER_1_0_ROOT_X86;
+            if (detected_path_x64 || detected_path_x32) {
+                // If both variables are present, favor the architecture
+                // of GStreamer which is the same as Node.js runtime.
+                if (detected_path_x64 && detected_path_x32) {
+                    if (process.arch == 'x64')
+                        detected_path = detected_path_x64;
+                    else if (process.arch == 'x32')
+                        detected_path = detected_path_x32;
+                } else {
+                    detected_path = detected_path_x64 || detected_path_x32;
+                }
+            }
+
+            if (detected_path) {
+                console.log('** DETECTED PATH IS TRUE **')
+                detected_path = Path.join(
+                    detected_path,
+                    'bin',
+                    (this.gst_launch_executable + '.exe'));
+                try {
+                    FS.accessSync(detected_path, FS.F_OK);
+                } catch (e) {
+                    console.log('** HIT AN ERROR TRYING TO ACCESS GSTREAMER PATH **')
+                    detected_path = undefined;
+                }
+            } else {
+                console.log('** Detected path is false ** ')
+                // Look for GStreamer on PATH
+                var path_dirs = process.env.PATH.split(';');
+                for (var index = 0; index < path_dirs.length; ++index) {
+                    try {
+                        var base = Path.normalize(path_dirs[index]);
+                        var bin = Path.join(
+                            base,
+                            (gst_launch_executable + '.exe'));
+                        FS.accessSync(bin, FS.F_OK);
+                        detected_path = bin;
+                    } catch (e) { /* no-op */ }
+                }
+            }
+        } else if (OS.platform() == 'linux') {
+            // Look for GStreamer on PATH
+            var path_dirs = process.env.PATH.split(':');
+            for (var index = 0; index < path_dirs.length; ++index) {
+                try {
+                    var base = Path.normalize(path_dirs[index]);
+                    var bin = Path.join(
+                        base,
+                        gst_launch_executable);
+                    FS.accessSync(bin, FS.F_OK);
+                    detected_path = bin;
+                } catch (e) { /* no-op */ }
+            }
+        } else if (OS.platform() == 'darwin') {
+            try {
+                var bin = '/usr/local/bin/gst-launch-1.0'
+                FS.accessSync(bin, FS.F_OK);
+                detected_path = bin;
+            } catch (e) { /* no-op */ }
+        }
+
+        console.log(detected_path)
+
+        return detected_path;
     }
 
     /**
@@ -54,6 +107,7 @@ class GstLaunch {
      * invoking the gst-launch executable or 'undefined' on failure.
      */
     getVersion( ) {
+        console.log('** CHECKING GSTREAMER VERSION **')
         let version_str = undefined;
         try {
             let gst_launch_path = this.getPath();
@@ -82,6 +136,7 @@ class GstLaunch {
      * @brief Answers true if gst-launch executable is available
      */
     isAvailable( ) {
+        console.log('** CHECKING GSTREAMER AVAILABILITY ** ')
         return this.getVersion() !== undefined;
     }
 
@@ -93,19 +148,17 @@ class GstLaunch {
      * https://gstreamer.freedesktop.org/data/doc/gstreamer/head/manual/html/chapter-programs.html
      * @usage spawnPipeline('videotestsrc ! autovideosink')
      */
-    spawnPipeline( pipeline ) {
-        Assert.ok( typeof( pipeline ), 'string' );
-        Assert.ok( this.isAvailable(), "gst-launch is not available." );
+    spawnPipeline = function(pipeline) {
+        Assert.ok(typeof(pipeline), 'string');
+        Assert.ok(this.isAvailable(), "gst-launch is not available.");
 
-        console.log( 'pipeline: ', pipeline );
+        var gst_launch_path = this.getPath();
+        Assert.ok(typeof(gst_launch_path), 'string');
 
-        let gst_launch_path = this.getPath();
-        Assert.ok( typeof( gst_launch_path ), 'string' );
-
-        console.log( 'path: ', gst_launch_path );
-
-        return Spawn( gst_launch_path, pipeline.split( ' ' ) );
+        return Spawn(gst_launch_path, pipeline.split(' '));
     }
+
+
 }
 
 /*!
@@ -214,8 +267,20 @@ class SocketCamWrapper {
         this.socket = Net.Socket();
 
         this.socket.connect( gst_tcp_port, gst_tcp_addr, () => {
+
+            const httpServer = Http.createServer()
+//				.listen( broadcast_tcp_port, broadcast_tcp_addr )
+
+            const SocketIO = require( 'socket.io' )(httpServer, {
+                cors: {
+                    origin: "*",
+                    methods: ["GET", "POST"]
+                }
+            });
+
+
             this.io = SocketIO.listen(
-                Http.createServer()
+                httpServer
                     .listen( broadcast_tcp_port, broadcast_tcp_addr ) );
 
             this.dicer = new Dicer( {
@@ -247,82 +312,8 @@ class SocketCamWrapper {
         } );
     };
 }
-//
-// /*!
-//  * @class LiveCamUI
-//  * @brief serves a minimal UI to view the webcam broadcast.
-//  */
-// function LiveCamUI() {
-//
-//     const Http = require( 'http' );
-//     const Assert = require( 'assert' );
-//     const template = ( function() {
-//         /*
-//             <!doctype html>
-//             <html lang="en">
-//                 <head>
-//                     <meta charset="utf-8">
-//                     <title>livecam UI</title>
-//                     <script type="text/javascript" src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
-//                     <script type="text/javascript" src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
-//                     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css">
-//                     <style type="text/css">html,body,.feed,.feed img{width:100%;height:100%;overflow:hidden;}</style>
-//                 </head>
-//                 <body>
-//                     <div class="feed"><img id="video" src="" /></div>
-//                     <script>
-//                         var webcam_addr = "@WEBCAM_ADDR@";
-//                         var webcam_port = "@WEBCAM_PORT@";
-//                         var webcam_host = $(".feed img");
-//                         var socket = io.connect('http://' + webcam_addr + ':' + webcam_port);
-//
-//                         socket.on('image', function (data) {
-//                             webcam_host.attr("src", "data:image/jpeg;base64," + data );
-//                         });
-//                     </script>
-//                 </body>
-//             </html>
-//             */
-//     } ).toString().match( /\/\*\s*([\s\S]*?)\s*\*\//m )[ 1 ];
-//
-//     var server = undefined;
-//
-//     var serve = function( ui_addr, ui_port, webcam_addr, webcam_port ) {
-//         Assert.ok( typeof( ui_addr ), 'object' );
-//         Assert.ok( typeof( ui_port ), 'number' );
-//         Assert.ok( typeof( webcam_addr ), 'object' );
-//         Assert.ok( typeof( webcam_port ), 'number' );
-//
-//         close();
-//         server = Http.createServer( function( request, response ) {
-//             response.writeHead( 200, {
-//                 "Content-Type": "text/html"
-//             } );
-//             response.write( template
-//                 .replace( '@WEBCAM_ADDR@', webcam_addr )
-//                 .replace( '@WEBCAM_PORT@', webcam_port ) );
-//             response.end();
-//         } );
-//         server.listen( ui_port, ui_addr );
-//
-//         console.log( 'Open http://' + ui_addr + ':' + ui_port + '/ in your browser!' );
-//     }
-//
-//     var close = function() {
-//         if( server ) {
-//             server.close();
-//             server = undefined;
-//         }
-//     }
-//
-//     return {
-//         'serve': serve,
-//         'close': close
-//     }
-//
-// }
 
-/*!
+/*
  * @class LiveCam
  * @brief starts a livecam server at given config params
  * @note config can have the following options:
@@ -399,8 +390,6 @@ class LiveCam {
             // This catches GStreamer when pipeline goes into PLAYING state
             if( data.toString().includes( 'Setting pipeline to PLAYING' ) > 0 ) {
                 this.gst_cam_wrap.wrap( this.gst_tcp_addr, this.gst_tcp_port, this.broadcast_addr, this.broadcast_port );
-                // gst_cam_ui.serve( ui_addr, ui_port, broadcast_addr, broadcast_port );
-                // gst_cam_ui.close();
 
                 if( this.start )
                     this.start();
@@ -419,13 +408,6 @@ class LiveCam {
             console.log( "Webcam server exited: " + code );
             // gst_cam_ui.close();
         } );
-    }
-
-    getLastImage( ) {
-        if( !this.gst_cam_wrap )
-            return '';
-
-        return this.gst_cam_wrap.getLastImage( );
     }
 }
 
